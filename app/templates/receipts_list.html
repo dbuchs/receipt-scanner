@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Receipts – Receipt Scanner{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4><i class="bi bi-list-ul"></i> All Receipts</h4>
+  <div class="d-flex gap-2">
+    <input type="search" id="merchantFilter" class="form-control form-control-sm" placeholder="Filter by merchant…" style="width:200px" />
+    <a href="/ui/inbox" class="btn btn-sm btn-outline-primary"><i class="bi bi-inbox"></i> Inbox</a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Merchant</th>
+          <th>Date</th>
+          <th>Items</th>
+          <th>Total</th>
+          <th>Source</th>
+          <th>Confidence</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="receiptsBody">
+        <tr><td colspan="7" class="text-center py-4 text-muted">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer d-flex justify-content-between align-items-center">
+    <button id="prevBtn" class="btn btn-sm btn-outline-secondary" disabled>← Prev</button>
+    <span id="pageInfo" class="text-muted small">Page 1</span>
+    <button id="nextBtn" class="btn btn-sm btn-outline-secondary">Next →</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let page = 0;
+const limit = 25;
+let currentMerchant = '';
+
+async function loadReceipts() {
+  const offset = page * limit;
+  const q = currentMerchant ? `&merchant=${encodeURIComponent(currentMerchant)}` : '';
+  const resp = await fetch(`/receipts?limit=${limit}&offset=${offset}${q}`);
+  const data = await resp.json();
+  const tbody = document.getElementById('receiptsBody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No receipts found</td></tr>';
+    document.getElementById('nextBtn').disabled = true;
+    return;
+  }
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td><a href="/ui/receipts/${r.id}">${r.merchant}</a></td>
+      <td>${r.purchase_datetime ? r.purchase_datetime.slice(0,10) : '—'}</td>
+      <td>—</td>
+      <td>${r.total != null ? '$'+parseFloat(r.total).toFixed(2) : '—'}</td>
+      <td><span class="badge bg-secondary">${r.source_type}</span></td>
+      <td><span class="badge ${conf(r.parse_confidence)}">${(r.parse_confidence*100).toFixed(0)}%</span></td>
+      <td>
+        <a href="/ui/receipts/${r.id}" class="btn btn-sm btn-outline-primary">View</a>
+      </td>
+    </tr>
+  `).join('');
+  document.getElementById('nextBtn').disabled = data.length < limit;
+  document.getElementById('prevBtn').disabled = page === 0;
+  document.getElementById('pageInfo').textContent = `Page ${page + 1}`;
+}
+
+function conf(c) { return c >= 0.8 ? 'bg-success' : c >= 0.5 ? 'bg-warning text-dark' : 'bg-danger'; }
+
+document.getElementById('nextBtn').addEventListener('click', () => { page++; loadReceipts(); });
+document.getElementById('prevBtn').addEventListener('click', () => { if(page>0){page--;loadReceipts();} });
+
+let filterTimer;
+document.getElementById('merchantFilter').addEventListener('input', e => {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(() => { currentMerchant = e.target.value; page = 0; loadReceipts(); }, 400);
+});
+
+loadReceipts();
+</script>
+{% endblock %}

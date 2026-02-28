@@ -1,0 +1,32 @@
+Walmart
+STORE #4567
+456 MAIN STREET
+ANYTOWN, TX 75001
+(555) 123-4567
+
+DATE: 10/22/23  TIME: 03:15 PM
+
+ITEMS PURCHASED
+-----------------------------------------
+GREAT VALUE MILK 1GAL  F      3.68
+WONDER BREAD           F      2.48
+BANANAS                F      0.63
+CHICKEN BREAST 3LB     F      8.97
+TIDE PODS 35CT                12.97
+PAPER PLATES 50CT              4.88
+CHEDDAR CHEESE 16OZ    F      4.48
+APPLE JUICE 64OZ       F      3.28
+
+-----------------------------------------
+SUBTOTAL                      41.37
+TAX 1                          1.04
+TOTAL                         42.41
+
+DEBIT XXXX-5678               42.41
+CHANGE DUE                     0.00
+
+ITEMS SOLD:  8
+TC# 1234-5678-9012-3456
+
+THANK YOU FOR SHOPPING AT WALMART!
+VISIT US AT WALMART.COM

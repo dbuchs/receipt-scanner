@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Rules & Taxonomy – Receipt Scanner{% endblock %}
+
+{% block content %}
+<ul class="nav nav-tabs mb-3" id="rulesTabs">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#taxonomyTab">Taxonomy</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#rulesTab">Rules</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#testTab">Test Rule</button></li>
+</ul>
+
+<div class="tab-content">
+  <!-- Taxonomy Tab -->
+  <div class="tab-pane fade show active" id="taxonomyTab">
+    <div class="d-flex justify-content-between mb-2">
+      <h5>Taxonomy Categories</h5>
+      <button class="btn btn-sm btn-primary" onclick="showNewCategoryForm()">+ New Category</button>
+    </div>
+    <div id="newCategoryForm" class="card mb-3 d-none">
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-md-4"><input id="catName" class="form-control form-control-sm" placeholder="Name" /></div>
+          <div class="col-md-4"><input id="catYnab" class="form-control form-control-sm" placeholder="YNAB Category ID (optional)" /></div>
+          <div class="col-md-4"><input id="catDesc" class="form-control form-control-sm" placeholder="Description" /></div>
+        </div>
+        <div class="mt-2">
+          <button class="btn btn-sm btn-success" onclick="createCategory()">Save</button>
+          <button class="btn btn-sm btn-secondary ms-1" onclick="document.getElementById('newCategoryForm').classList.add('d-none')">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <table class="table table-sm table-hover">
+      <thead class="table-light"><tr><th>Name</th><th>YNAB ID</th><th>Description</th><th>Actions</th></tr></thead>
+      <tbody id="taxonomyBody"><tr><td colspan="4" class="text-center text-muted">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- Rules Tab -->
+  <div class="tab-pane fade" id="rulesTab">
+    <div class="d-flex justify-content-between mb-2">
+      <h5>Category Rules</h5>
+      <button class="btn btn-sm btn-primary" onclick="showNewRuleForm()">+ New Rule</button>
+    </div>
+    <div id="newRuleForm" class="card mb-3 d-none">
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-md-3"><input id="ruleName" class="form-control form-control-sm" placeholder="Rule name" /></div>
+          <div class="col-md-2">
+            <select id="ruleType" class="form-select form-select-sm">
+              <option value="contains">contains</option>
+              <option value="regex">regex</option>
+              <option value="merchant_dept">merchant_dept</option>
+            </select>
+          </div>
+          <div class="col-md-3"><input id="rulePattern" class="form-control form-control-sm" placeholder="Pattern" /></div>
+          <div class="col-md-2"><input id="rulePriority" type="number" class="form-control form-control-sm" placeholder="Priority" value="0" /></div>
+          <div class="col-md-2">
+            <select id="ruleTaxonomy" class="form-select form-select-sm">
+              <option value="">Select category…</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-2">
+          <button class="btn btn-sm btn-success" onclick="createRule()">Save</button>
+          <button class="btn btn-sm btn-secondary ms-1" onclick="document.getElementById('newRuleForm').classList.add('d-none')">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <table class="table table-sm table-hover">
+      <thead class="table-light"><tr><th>Name</th><th>Type</th><th>Pattern</th><th>Priority</th><th>Active</th><th>Category</th><th>Actions</th></tr></thead>
+      <tbody id="rulesBody"><tr><td colspan="7" class="text-center text-muted">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- Test Tab -->
+  <div class="tab-pane fade" id="testTab">
+    <h5>Test a Rule</h5>
+    <div class="card">
+      <div class="card-body">
+        <div class="mb-2"><input id="testText" class="form-control" placeholder="Item description to test…" /></div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-4"><input id="testMerchant" class="form-control form-control-sm" placeholder="Merchant (optional)" /></div>
+          <div class="col-md-4"><input id="testDept" class="form-control form-control-sm" placeholder="Department (optional)" /></div>
+        </div>
+        <button class="btn btn-primary" onclick="testRule()">Test</button>
+        <div id="testResult" class="mt-3"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let categories = [];
+
+async function loadTaxonomy() {
+  const resp = await fetch('/taxonomy');
+  categories = await resp.json();
+  document.getElementById('taxonomyBody').innerHTML = categories.map(c => `
+    <tr>
+      <td>${c.name}</td>
+      <td class="text-muted small">${c.ynab_category_id || '—'}</td>
+      <td class="text-muted small">${c.description || ''}</td>
+      <td>
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory('${c.id}')">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+  const sel = document.getElementById('ruleTaxonomy');
+  sel.innerHTML = '<option value="">Select category…</option>' +
+    categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+}
+
+async function loadRules() {
+  const resp = await fetch('/rules');
+  const rules = await resp.json();
+  document.getElementById('rulesBody').innerHTML = rules.map(r => `
+    <tr>
+      <td>${r.name}</td>
+      <td><span class="badge bg-info text-dark">${r.rule_type}</span></td>
+      <td><code>${r.pattern}</code></td>
+      <td>${r.priority}</td>
+      <td>${r.is_active ? '<i class="bi bi-check-circle text-success"></i>' : '<i class="bi bi-x-circle text-danger"></i>'}</td>
+      <td class="text-muted small">${r.taxonomy_category_id}</td>
+      <td>
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteRule('${r.id}')">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function showNewCategoryForm() { document.getElementById('newCategoryForm').classList.remove('d-none'); }
+function showNewRuleForm() { loadTaxonomy(); document.getElementById('newRuleForm').classList.remove('d-none'); }
+
+async function createCategory() {
+  await fetch('/taxonomy', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name: document.getElementById('catName').value,
+      ynab_category_id: document.getElementById('catYnab').value || null,
+      description: document.getElementById('catDesc').value || null }) });
+  document.getElementById('newCategoryForm').classList.add('d-none');
+  loadTaxonomy();
+}
+
+async function deleteCategory(id) {
+  if (!confirm('Delete this category?')) return;
+  await fetch(`/taxonomy/${id}`, { method: 'DELETE' });
+  loadTaxonomy();
+}
+
+async function createRule() {
+  await fetch('/rules', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name: document.getElementById('ruleName').value,
+      rule_type: document.getElementById('ruleType').value,
+      pattern: document.getElementById('rulePattern').value,
+      priority: parseInt(document.getElementById('rulePriority').value) || 0,
+      taxonomy_category_id: document.getElementById('ruleTaxonomy').value }) });
+  document.getElementById('newRuleForm').classList.add('d-none');
+  loadRules();
+}
+
+async function deleteRule(id) {
+  if (!confirm('Delete this rule?')) return;
+  await fetch(`/rules/${id}`, { method: 'DELETE' });
+  loadRules();
+}
+
+async function testRule() {
+  const payload = { text: document.getElementById('testText').value,
+    merchant: document.getElementById('testMerchant').value || null,
+    department: document.getElementById('testDept').value || null };
+  const resp = await fetch('/rules/test', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  const result = await resp.json();
+  document.getElementById('testResult').innerHTML = result.matched
+    ? `<div class="alert alert-success"><strong>Matched!</strong> ${result.explanation}</div>`
+    : `<div class="alert alert-warning">No match. ${result.explanation}</div>`;
+}
+
+loadTaxonomy();
+loadRules();
+</script>
+{% endblock %}

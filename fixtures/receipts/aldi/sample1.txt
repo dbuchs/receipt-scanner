@@ -1,0 +1,29 @@
+ALDI
+STORE #789
+789 OAK AVENUE
+ANYTOWN, IL 60601
+(555) 987-6543
+
+DATE: 11/05/23   TIME: 10:22 AM
+
+-----------------------------------------
+WHOLE MILK 1GAL         T      1.99
+SOURDOUGH BREAD                0.99
+FREE RANGE EGGS 12CT    T      3.29
+ATLANTIC SALMON 1LB     T      5.99
+BROCCOLI FLORETS               1.49
+GREEK YOGURT 32OZ       T      3.99
+SPARKLING WATER 12PK           3.49
+CHEDDAR SLICES 12OZ     T      2.79
+
+-----------------------------------------
+SUBTOTAL                      23.02
+TAX                            0.48
+TOTAL                         23.50
+
+VISA DEBIT ****9012            23.50
+CHANGE                         0.00
+
+CASHIER: 042
+THANK YOU FOR SHOPPING AT ALDI
+VISIT US AT ALDI.US

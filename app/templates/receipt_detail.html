@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Receipt Detail – Receipt Scanner{% endblock %}
+
+{% block content %}
+<div id="receiptDetail">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4><i class="bi bi-receipt"></i> Receipt Detail</h4>
+    <a href="/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back</a>
+  </div>
+
+  <div class="row" id="receiptMeta">
+    <div class="col-md-6">
+      <div class="card mb-3">
+        <div class="card-header">Receipt Info</div>
+        <div class="card-body" id="receiptInfoBody">
+          <div class="text-center text-muted py-3">Loading…</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card mb-3">
+        <div class="card-header">YNAB Match</div>
+        <div class="card-body" id="ynabMatchBody">
+          <a id="ynabMatchLink" href="#" class="btn btn-success w-100">
+            <i class="bi bi-link-45deg"></i> Find YNAB Match
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Line Items -->
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between">
+      <span><i class="bi bi-list-check"></i> Line Items</span>
+      <span id="itemCount" class="badge bg-secondary">0</span>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Description</th>
+            <th>SKU</th>
+            <th>Qty</th>
+            <th>Unit Price</th>
+            <th>Total</th>
+            <th>Tax</th>
+            <th>Category</th>
+          </tr>
+        </thead>
+        <tbody id="lineItemsBody">
+          <tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const receiptId = "{{ receipt_id }}";
+
+async function loadReceipt() {
+  const resp = await fetch(`/receipts/${receiptId}`);
+  if (!resp.ok) { document.getElementById('receiptDetail').innerHTML = '<div class="alert alert-danger">Receipt not found</div>'; return; }
+  const r = await resp.json();
+
+  document.getElementById('receiptInfoBody').innerHTML = `
+    <dl class="row mb-0">
+      <dt class="col-sm-4">Merchant</dt><dd class="col-sm-8">${r.merchant}</dd>
+      <dt class="col-sm-4">Date</dt><dd class="col-sm-8">${r.purchase_datetime ? r.purchase_datetime.slice(0,10) : '—'}</dd>
+      <dt class="col-sm-4">Subtotal</dt><dd class="col-sm-8">${fmt(r.subtotal)}</dd>
+      <dt class="col-sm-4">Tax</dt><dd class="col-sm-8">${fmt(r.tax)}</dd>
+      <dt class="col-sm-4">Total</dt><dd class="col-sm-8"><strong>${fmt(r.total)}</strong></dd>
+      <dt class="col-sm-4">Card Last4</dt><dd class="col-sm-8">${r.payment_method_last4 || '—'}</dd>
+      <dt class="col-sm-4">Confidence</dt>
+      <dd class="col-sm-8"><span class="badge ${conf(r.parse_confidence)}">${(r.parse_confidence*100).toFixed(0)}%</span></dd>
+      <dt class="col-sm-4">Notes</dt><dd class="col-sm-8 text-muted small">${r.parse_notes || '—'}</dd>
+    </dl>
+  `;
+
+  document.getElementById('ynabMatchLink').href = `/ui/ynab/match/${receiptId}`;
+
+  const items = r.line_items || [];
+  document.getElementById('itemCount').textContent = items.length;
+  document.getElementById('lineItemsBody').innerHTML = items.length ? items.map(li => `
+    <tr>
+      <td>${li.description_normalized}</td>
+      <td class="text-muted small">${li.sku || ''}</td>
+      <td>${li.quantity}</td>
+      <td>${fmt(li.unit_price)}</td>
+      <td>${fmt(li.total_price)}</td>
+      <td>${li.tax_flag ? '<i class="bi bi-check-circle text-warning"></i>' : ''}</td>
+      <td class="text-muted small">${li.taxonomy_category_id || 'uncategorized'}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" class="text-center text-muted">No line items</td></tr>';
+}
+
+function fmt(v) { return v != null ? '$' + parseFloat(v).toFixed(2) : '—'; }
+function conf(c) { return c >= 0.8 ? 'bg-success' : c >= 0.5 ? 'bg-warning text-dark' : 'bg-danger'; }
+
+loadReceipt();
+</script>
+{% endblock %}
