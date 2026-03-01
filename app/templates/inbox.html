@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Inbox – Receipt Scanner{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4><i class="bi bi-inbox"></i> Unmatched Receipts Inbox</h4>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+        <i class="bi bi-upload"></i> Upload Receipt
+      </button>
+    </div>
+
+    <!-- Drag & Drop Upload Zone -->
+    <div id="dropZone"
+         class="border border-2 border-dashed rounded p-5 text-center text-muted mb-4"
+         style="cursor:pointer; border-style: dashed !important;">
+      <i class="bi bi-cloud-upload fs-1"></i>
+      <p class="mt-2 mb-0">Drag &amp; drop receipt files here, or click to browse</p>
+      <small>Supported: PDF, TXT, PNG, JPG</small>
+      <input type="file" id="fileInput" class="d-none" multiple accept=".pdf,.txt,.png,.jpg,.jpeg" />
+    </div>
+
+    <!-- Upload progress -->
+    <div id="uploadProgress" class="d-none mb-3">
+      <div class="progress">
+        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated"
+             style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Receipts table -->
+    <div class="card shadow-sm">
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0" id="inboxTable">
+          <thead class="table-light">
+            <tr>
+              <th>Merchant</th>
+              <th>Date</th>
+              <th>Total</th>
+              <th>Confidence</th>
+              <th>Source</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="inboxBody">
+            <tr><td colspan="6" class="text-center py-4 text-muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Upload Receipts</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="uploadForm" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label class="form-label">Select files</label>
+            <input type="file" class="form-control" name="files" multiple
+                   accept=".pdf,.txt,.png,.jpg,.jpeg" required />
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-upload"></i> Upload
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function loadInbox() {
+  const resp = await fetch('/inbox');
+  const data = await resp.json();
+  const tbody = document.getElementById('inboxBody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No unmatched receipts</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td><a href="/ui/receipts/${r.id}">${r.merchant}</a></td>
+      <td>${r.purchase_datetime ? r.purchase_datetime.slice(0,10) : '—'}</td>
+      <td>${r.total != null ? '$' + parseFloat(r.total).toFixed(2) : '—'}</td>
+      <td>
+        <span class="badge ${confidenceBadge(r.parse_confidence)}">
+          ${(r.parse_confidence * 100).toFixed(0)}%
+        </span>
+      </td>
+      <td><span class="badge bg-secondary">${r.source_type}</span></td>
+      <td>
+        <a href="/ui/receipts/${r.id}" class="btn btn-sm btn-outline-primary">View</a>
+        <a href="/ui/ynab/match/${r.id}" class="btn btn-sm btn-outline-success">Match YNAB</a>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function confidenceBadge(c) {
+  if (c >= 0.8) return 'bg-success';
+  if (c >= 0.5) return 'bg-warning text-dark';
+  return 'bg-danger';
+}
+
+// Drag & Drop
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('bg-light'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('bg-light'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('bg-light');
+  uploadFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => uploadFiles(fileInput.files));
+
+async function uploadFiles(files) {
+  const form = new FormData();
+  for (const f of files) form.append('files', f);
+  document.getElementById('uploadProgress').classList.remove('d-none');
+  const bar = document.getElementById('progressBar');
+  bar.style.width = '50%';
+  try {
+    const resp = await fetch('/upload', { method: 'POST', body: form });
+    bar.style.width = '100%';
+    const data = await resp.json();
+    setTimeout(() => {
+      document.getElementById('uploadProgress').classList.add('d-none');
+      bar.style.width = '0%';
+      loadInbox();
+    }, 800);
+  } catch(e) {
+    bar.classList.replace('bg-primary', 'bg-danger');
+  }
+}
+
+// Upload form
+document.getElementById('uploadForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  await fetch('/upload', { method: 'POST', body: fd });
+  bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
+  loadInbox();
+});
+
+loadInbox();
+</script>
+{% endblock %}

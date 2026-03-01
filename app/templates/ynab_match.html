@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}YNAB Match – Receipt Scanner{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4><i class="bi bi-link-45deg"></i> Match Receipt to YNAB Transaction</h4>
+  <a href="/ui/receipts/{{ receipt_id }}" class="btn btn-sm btn-outline-secondary">← Back</a>
+</div>
+
+<div id="matchContent">
+  <div class="text-center text-muted py-5">
+    <div class="spinner-border" role="status"></div>
+    <p class="mt-2">Fetching YNAB candidates…</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const receiptId = "{{ receipt_id }}";
+
+async function loadCandidates() {
+  const resp = await fetch(`/ynab/match/${receiptId}`);
+  if (!resp.ok) {
+    document.getElementById('matchContent').innerHTML =
+      '<div class="alert alert-warning">Could not load YNAB candidates. Is YNAB connected?</div>';
+    return;
+  }
+  const candidates = await resp.json();
+  if (!candidates.length) {
+    document.getElementById('matchContent').innerHTML =
+      '<div class="alert alert-info">No matching YNAB transactions found.</div>';
+    return;
+  }
+
+  document.getElementById('matchContent').innerHTML = `
+    <table class="table table-hover">
+      <thead class="table-light">
+        <tr>
+          <th>Payee</th>
+          <th>Date</th>
+          <th>Amount</th>
+          <th>Account</th>
+          <th>Score</th>
+          <th>Details</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${candidates.map(c => `
+          <tr>
+            <td>${c.payee_name}</td>
+            <td>${c.transaction_date}</td>
+            <td>$${(Math.abs(c.amount_milliunits)/1000).toFixed(2)}</td>
+            <td class="text-muted small">${c.account_name}</td>
+            <td>
+              <div class="progress" style="width:80px;height:18px">
+                <div class="progress-bar ${scoreColor(c.score)}" style="width:${(c.score*100).toFixed(0)}%">
+                  ${(c.score*100).toFixed(0)}%
+                </div>
+              </div>
+            </td>
+            <td class="text-muted small">${c.explanation}</td>
+            <td>
+              <button class="btn btn-sm btn-success" onclick="confirmMatch('${c.transaction_id}', ${c.score})">
+                Link
+              </button>
+              <a href="/ui/ynab/split/${receiptId}/confirm?txn=${c.transaction_id}" class="btn btn-sm btn-outline-primary">
+                Split
+              </a>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function scoreColor(s) {
+  if (s >= 0.7) return 'bg-success';
+  if (s >= 0.4) return 'bg-warning';
+  return 'bg-danger';
+}
+
+async function confirmMatch(txnId, score) {
+  const resp = await fetch(`/ynab/match/${receiptId}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ ynab_transaction_id: txnId, match_score: score })
+  });
+  if (resp.ok) {
+    alert('Match confirmed!');
+    window.location.href = `/ui/receipts/${receiptId}`;
+  } else {
+    alert('Error confirming match.');
+  }
+}
+
+loadCandidates();
+</script>
+{% endblock %}
